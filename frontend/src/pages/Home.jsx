@@ -1,117 +1,114 @@
-import { useContext } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { Area, AreaChart, ResponsiveContainer, Tooltip } from 'recharts';
+import api from '../api.js';
 import Icon from '../components/Icons.jsx';
-import { AppActionContext } from '../components/Layout.jsx';
+import { inr, num } from '../lib/format.js';
 
-const sendActions = [
-  { title: 'Scan & Pay', icon: 'scan', action: 'scan' },
-  { title: 'To Mobile', icon: 'mobile', action: 'mobile' },
-  { title: 'To Self', icon: 'person', action: 'self' },
-  { title: 'To Bank A/c', icon: 'bank', action: 'bank' },
-];
+const refreshEveryMs = 30_000;
 
-const savingsTools = [
-  { title: 'Expenses', icon: 'receipt', to: '/transactions' },
-  { title: 'Savings goals', icon: 'piggy', to: '/dashboard' },
-  { title: 'Statistics', icon: 'chart', to: '/dashboard' },
-];
-
-const accountTools = [
-  { title: 'Transaction history', icon: 'receipt', to: '/transactions' },
-  { title: 'Borrower accounts', icon: 'bank', to: '/borrowers' },
-  { title: 'Payment activity', icon: 'wallet', to: '/transactions' },
-  { title: 'Safety alerts', icon: 'shield', to: '/alerts' },
-];
-
-function CardHeading({ title, subtitle, to, action = 'View all' }) {
-  return (
-    <div className="home-card-heading">
-      <div>
-        <h2>{title}</h2>
-        {subtitle && <p>{subtitle}</p>}
-      </div>
-      {to && <Link to={to} className="home-card-link">{action}<Icon name="arrow" size={16} /></Link>}
-    </div>
-  );
+function StatCard({ label, value, detail, icon, tone = 'blue', to }) {
+  const content = <>
+    <div className="intel-stat-top"><span className={`intel-stat-icon ${tone}`}><Icon name={icon} size={19} /></span><span className="intel-stat-label">{label}</span></div>
+    <strong className="intel-stat-value">{value}</strong>
+    <span className="intel-stat-detail">{detail}</span>
+  </>;
+  return to ? <Link className="intel-stat" to={to}>{content}<span className="intel-stat-arrow"><Icon name="arrow" size={16} /></span></Link> : <div className="intel-stat">{content}</div>;
 }
 
 export default function Home() {
-  const { openScan, openPayment } = useContext(AppActionContext);
+  const [data, setData] = useState(null);
+  const [error, setError] = useState('');
+  const [updatedAt, setUpdatedAt] = useState(null);
+  const [refreshing, setRefreshing] = useState(false);
+
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      if (mounted) setRefreshing(true);
+      try {
+        const result = await api.dashboard();
+        if (!mounted) return;
+        setData(result);
+        setError('');
+        setUpdatedAt(new Date());
+      } catch (err) {
+        if (mounted) setError(err.message || 'Could not reach the analytics service');
+      } finally {
+        if (mounted) setRefreshing(false);
+      }
+    };
+    refresh();
+    const timer = window.setInterval(refresh, refreshEveryMs);
+    return () => { mounted = false; window.clearInterval(timer); };
+  }, []);
+
+  const k = data?.kpis || {};
+  const trends = data?.trends || [];
+  const models = data?.model_status || {};
+  const fallback = Object.values(models).some((model) => model && (model.forced_fallback || !model.loaded));
 
   return (
-    <div className="home-screen">
-      <section className="save-hero">
-        <div className="hero-copy">
-          <span className="hero-kicker">A little more control, every day</span>
-          <h1>Make room for your next goal.</h1>
-          <p>Keep spending, saving and account activity together in one simple view.</p>
-          <Link className="hero-button" to="/dashboard">
-            Explore insights <Icon name="arrow" size={17} />
-          </Link>
+    <div className="intel-home">
+      <section className="intel-hero">
+        <div className="intel-hero-copy">
+          <div className="intel-eyebrow"><span className="intel-live-dot" /> FINTECHSICO <span className="intel-eyebrow-divider">/</span> FRAUDSHIELD</div>
+          <h2>See the signal.<br /><span>Act with confidence.</span></h2>
+          <p>One focused command center for suspicious transactions, anomaly patterns and repayment risk.</p>
+          <div className="intel-hero-actions">
+            <Link className="intel-primary-btn" to="/dashboard">Open risk overview <Icon name="arrow" size={17} /></Link>
+            <Link className="intel-secondary-btn" to="/alerts">Review alert queue <Icon name="shield" size={16} /></Link>
+          </div>
+          <div className="intel-demo-note"><span className="intel-demo-mark">◆</span> DEMO ENVIRONMENT <span>·</span> Synthetic sample data</div>
         </div>
-        <div className="hero-art" aria-hidden="true">
-          <span className="hero-rupee">₹</span>
-          <div className="piggy-illustration"><Icon name="piggy" size={86} strokeWidth={1.4} /></div>
-          <span className="hero-spark spark-one">✦</span>
-          <span className="hero-spark spark-two">✦</span>
+        <div className="intel-orbit" aria-hidden="true">
+          <div className="intel-orbit-grid" />
+          <div className="intel-ring ring-a" /><div className="intel-ring ring-b" /><div className="intel-ring ring-c" />
+          <div className="intel-orbit-track"><span className="intel-orbit-node node-a" /><span className="intel-orbit-node node-b" /><span className="intel-orbit-node node-c" /></div>
+          <div className="intel-core"><Icon name="shield" size={43} strokeWidth={1.35} /><span>RISK<br />ENGINE</span></div>
+          <div className="intel-orbit-caption"><span className="intel-live-dot" /> SIGNAL MONITORING</div>
+          <div className="intel-orbit-coord">28.6139° N&nbsp;&nbsp; 77.2090° E</div>
+        </div>
+        <div className="intel-hero-index">01 <span>/ 04</span></div>
+      </section>
+
+      <section className="intel-section">
+        <div className="intel-section-heading">
+          <div><div className="intel-section-kicker">OPERATIONS SNAPSHOT</div><h3>Risk at a glance</h3></div>
+          <div className={`intel-refresh ${error ? 'offline' : ''}`}><span className={`intel-live-dot ${error ? 'offline' : ''}`} />{error ? 'API unavailable' : refreshing ? 'Syncing' : 'Live monitoring'}<span className="intel-refresh-time">{updatedAt ? `· ${updatedAt.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}` : ''}</span></div>
+        </div>
+        {error && <div className="intel-inline-error">{error} <button type="button" onClick={() => window.location.reload()}>Reload</button></div>}
+        <div className="intel-stats-grid">
+          <StatCard label="Transactions analyzed" value={data ? num(k.transactions_total) : '—'} detail={`${data ? inr(k.transaction_volume, { compact: true }) : '—'} total volume`} icon="activity" tone="blue" to="/transactions" />
+          <StatCard label="Suspicious activity" value={data ? num(k.suspicious_transactions) : '—'} detail={`${data ? num(k.review_transactions) : '—'} flagged for review`} icon="scan" tone="coral" to="/transactions" />
+          <StatCard label="Open alerts" value={data ? num(k.open_alerts) : '—'} detail="Awaiting analyst action" icon="bell" tone="amber" to="/alerts" />
+          <StatCard label="High-risk borrowers" value={data ? num(k.high_risk_borrowers) : '—'} detail={`${data ? num(k.critical_borrowers) : '—'} in critical band`} icon="wallet" tone="violet" to="/borrowers" />
         </div>
       </section>
 
-      <div className="home-feed">
-        <section className="home-card send-card">
-          <CardHeading title="Send Money" subtitle="From your bank account or wallet" to="/transactions" action="Recent" />
-          <div className="send-actions">
-            {sendActions.map((item) => (
-              <button
-                className="send-action"
-                key={item.title}
-                type="button"
-                onClick={() => item.action === 'scan' ? openScan() : openPayment(item.title)}
-              >
-                <span className="action-icon"><Icon name={item.icon} size={27} /></span>
-                <span>{item.title}</span>
-              </button>
-            ))}
+      <section className="intel-lower-grid">
+        <div className="intel-panel intel-trend-panel">
+          <div className="intel-panel-heading"><div><div className="intel-section-kicker">MODEL ACTIVITY</div><h3>Transaction signal</h3></div><Link to="/dashboard" className="intel-text-link">Full analytics <Icon name="arrow" size={15} /></Link></div>
+          <p className="intel-panel-description">Weekly transaction volume and average fraud score from the analytics service.</p>
+          {trends.length ? <div className="intel-chart-wrap"><ResponsiveContainer width="100%" height={184}><AreaChart data={trends}>
+            <defs><linearGradient id="intelChartGlow" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#5ce1e6" stopOpacity={0.32} /><stop offset="100%" stopColor="#5ce1e6" stopOpacity={0} /></linearGradient></defs>
+            <Tooltip contentStyle={{ background: '#101b2a', border: '1px solid #263d50', borderRadius: 10, color: '#e7f4f6', fontSize: 11 }} labelStyle={{ color: '#89a6b2' }} />
+            <Area type="monotone" dataKey="tx_count" name="Transactions" stroke="#5ce1e6" strokeWidth={2.5} fill="url(#intelChartGlow)" activeDot={{ r: 4, fill: '#adfbff', stroke: '#5ce1e6' }} />
+          </AreaChart></ResponsiveContainer></div> : <div className="intel-chart-empty">{data ? 'No trend data returned yet.' : 'Connecting to the analytics service…'}</div>}
+          <div className="intel-chart-legend"><span><i /> Transaction count</span><span className="intel-chart-period">WEEKLY AGGREGATION</span></div>
+        </div>
+        <div className="intel-panel intel-health-panel">
+          <div className="intel-panel-heading"><div><div className="intel-section-kicker">DECISION SUPPORT</div><h3>System readiness</h3></div><span className={`intel-readiness ${!data || error || fallback ? 'caution' : 'ready'}`}><i />{error ? 'Offline' : !data ? 'Connecting' : fallback ? 'Review' : 'Ready'}</span></div>
+          <p className="intel-panel-description">Model state and review workload, reported by your local API.</p>
+          <div className="intel-health-list">
+            <div className="intel-health-row"><span className="intel-health-icon cyan"><Icon name="chart" size={17} /></span><span><strong>Average fraud score</strong><small>Across scored transactions</small></span><b>{data ? `${k.fraud_score_avg ?? '—'}/100` : '—'}</b></div>
+            <div className="intel-health-row"><span className="intel-health-icon purple"><Icon name="wallet" size={17} /></span><span><strong>Borrowers monitored</strong><small>Repayment score available</small></span><b>{data ? num(k.borrowers_total) : '—'}</b></div>
+            <div className="intel-health-row"><span className="intel-health-icon orange"><Icon name="shield" size={17} /></span><span><strong>Pending interventions</strong><small>Recommended analyst actions</small></span><b>{data ? num(k.pending_interventions) : '—'}</b></div>
           </div>
-        </section>
-
-        <section className="home-card savings-card">
-          <CardHeading title={<>FintechSico Save <span className="title-emoji">✦</span></>} subtitle="Smarter ways to understand and plan your money" />
-          <div className="savings-tools">
-            {savingsTools.map((item) => (
-              <Link className="home-tool" to={item.to} key={item.title}>
-                <span className={`tool-icon ${item.icon}`}><Icon name={item.icon} size={27} /></span>
-                <span>{item.title}</span>
-              </Link>
-            ))}
-          </div>
-        </section>
-
-        <section className="home-card accounts-card">
-          <CardHeading title="My Accounts" subtitle="Your accounts and payment activity" to="/more" action="Manage" />
-          <div className="account-tools">
-            {accountTools.map((item) => (
-              <Link className="account-tool" to={item.to} key={item.title}>
-                <span className="account-icon"><Icon name={item.icon} size={26} /></span>
-                <span>{item.title}</span>
-              </Link>
-            ))}
-          </div>
-          <div className="account-card-footer">
-            <span className="account-avatar"><Icon name="bank" size={16} /></span>
-            <span><strong>Account activity</strong><small>Transactions, accounts and alerts</small></span>
-            <Link to="/transactions" aria-label="View account activity"><Icon name="arrow" size={19} /></Link>
-          </div>
-        </section>
-
-        <Link className="home-promo" to="/alerts">
-          <span className="promo-icon"><Icon name="shield" size={25} /></span>
-          <span className="promo-copy"><strong>Stay in control of every payment</strong><small>Review activity and get to important alerts quickly.</small></span>
-          <Icon name="arrow" size={20} />
-        </Link>
-
-        <p className="home-demo-note">Payment screens are a prototype preview. No money is moved.</p>
-      </div>
+          <div className="intel-health-foot"><span className={`intel-live-dot ${fallback ? 'offline' : ''}`} />{error ? 'Waiting for API connection' : fallback ? 'One or more models use fallback mode' : 'Analytics API connected'}<Link to="/models">Model details <Icon name="arrow" size={14} /></Link></div>
+        </div>
+      </section>
+      <footer className="intel-footer"><span>FRAUDSHIELD <span>·</span> RISK INTELLIGENCE</span><span>Refreshes every 30 seconds <span>·</span> Demo data only</span></footer>
     </div>
   );
 }
